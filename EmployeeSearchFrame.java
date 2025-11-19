@@ -5,7 +5,6 @@
  */
 
 import java.awt.EventQueue;
-
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
@@ -16,10 +15,17 @@ import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JList;
 import javax.swing.JCheckBox;
+import javax.swing.JOptionPane;
+import javax.swing.JScrollPane;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
-import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.List;
 
 public class EmployeeSearchFrame extends JFrame {
 
@@ -31,6 +37,14 @@ public class EmployeeSearchFrame extends JFrame {
 	private JList<String> lstProject;
 	private DefaultListModel<String> project = new DefaultListModel<String>();
 	private JTextArea textAreaEmployee;
+	private JCheckBox chckbxNotDept;
+	private JCheckBox chckbxNotProject;
+	
+	// Database connection parameters
+	private static final String DB_URL_PREFIX = "jdbc:mysql://localhost:3306/";
+	private static final String DB_USER = "root";  // Change as needed
+	private static final String DB_PASSWORD = "";  // Change as needed
+	private Connection connection = null;
 	/**
 	 * Launch the application.
 	 */
@@ -66,6 +80,7 @@ public class EmployeeSearchFrame extends JFrame {
 		contentPane.add(lblNewLabel);
 		
 		txtDatabase = new JTextField();
+		txtDatabase.setText("company");  // Default database name
 		txtDatabase.setBounds(90, 20, 193, 20);
 		contentPane.add(txtDatabase);
 		txtDatabase.setColumns(10);
@@ -77,15 +92,24 @@ public class EmployeeSearchFrame extends JFrame {
 		 */
 		btnDBFill.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				String[] dept = {"Headquarters", "Reorganization"};	
-				for(int i = 0; i < dept.length; i++) {
-					department.addElement(dept[i]);
-				}
-				String[] prj = {"ProdoctX", "ProductY", "ProductZ"};
-				for(int j = 0; j < prj.length; j++) {
-					project.addElement(prj[j]);
+				String dbName = txtDatabase.getText().trim();
+				if (dbName.isEmpty()) {
+					JOptionPane.showMessageDialog(EmployeeSearchFrame.this, 
+						"Please enter a database name.", "Error", JOptionPane.ERROR_MESSAGE);
+					return;
 				}
 				
+				// Close existing connection if any
+				closeConnection();
+				
+				// Connect to database and load data
+				if (connectToDatabase(dbName)) {
+					loadDepartments();
+					loadProjects();
+					JOptionPane.showMessageDialog(EmployeeSearchFrame.this, 
+						"Successfully loaded departments and projects from database: " + dbName, 
+						"Success", JOptionPane.INFORMATION_MESSAGE);
+				}
 			}
 		});
 		
@@ -103,35 +127,52 @@ public class EmployeeSearchFrame extends JFrame {
 		lblProject.setBounds(255, 63, 47, 14);
 		contentPane.add(lblProject);
 		
+		// Department list with scroll pane
+		lstDepartment = new JList<String>(new DefaultListModel<String>());
+		lstDepartment.setFont(new Font("Tahoma", Font.PLAIN, 12));
+		lstDepartment.setModel(department);
+		JScrollPane scrollDept = new JScrollPane(lstDepartment);
+		scrollDept.setBounds(36, 84, 172, 60);
+		contentPane.add(scrollDept);
+		
+		// Project list with scroll pane
 		lstProject = new JList<String>(new DefaultListModel<String>());
 		lstProject.setFont(new Font("Tahoma", Font.PLAIN, 12));
 		lstProject.setModel(project);
-		lstProject.setBounds(225, 84, 150, 42);
-		contentPane.add(lstProject);
+		JScrollPane scrollProj = new JScrollPane(lstProject);
+		scrollProj.setBounds(225, 84, 150, 60);
+		contentPane.add(scrollProj);
 		
-		JCheckBox chckbxNotDept = new JCheckBox("Not");
-		chckbxNotDept.setBounds(71, 133, 59, 23);
+		chckbxNotDept = new JCheckBox("Not");
+		chckbxNotDept.setBounds(71, 150, 59, 23);
 		contentPane.add(chckbxNotDept);
 		
-		JCheckBox chckbxNotProject = new JCheckBox("Not");
-		chckbxNotProject.setBounds(270, 133, 59, 23);
+		chckbxNotProject = new JCheckBox("Not");
+		chckbxNotProject.setBounds(270, 150, 59, 23);
 		contentPane.add(chckbxNotProject);
-		
-		lstDepartment = new JList<String>(new DefaultListModel<String>());
-		lstDepartment.setBounds(36, 84, 172, 40);
-		contentPane.add(lstDepartment);
-		lstDepartment.setFont(new Font("Tahoma", Font.PLAIN, 12));
-		lstDepartment.setModel(department);
 		
 		JLabel lblEmployee = new JLabel("Employee");
 		lblEmployee.setFont(new Font("Times New Roman", Font.BOLD, 12));
 		lblEmployee.setBounds(52, 179, 89, 14);
 		contentPane.add(lblEmployee);
 		
+		textAreaEmployee = new JTextArea();
+		textAreaEmployee.setEditable(false);
+		textAreaEmployee.setFont(new Font("Courier New", Font.PLAIN, 11));
+		JScrollPane scrollEmployee = new JScrollPane(textAreaEmployee);
+		scrollEmployee.setBounds(36, 215, 375, 100);
+		contentPane.add(scrollEmployee);
+		
 		JButton btnSearch = new JButton("Search");
 		btnSearch.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				textAreaEmployee.setText("John Smith\nFranklin Wong");
+				if (connection == null) {
+					JOptionPane.showMessageDialog(EmployeeSearchFrame.this, 
+						"Please connect to database first by clicking Fill button.", 
+						"Error", JOptionPane.ERROR_MESSAGE);
+					return;
+				}
+				searchEmployees();
 			}
 		});
 		btnSearch.setBounds(80, 276, 89, 23);
@@ -141,13 +182,221 @@ public class EmployeeSearchFrame extends JFrame {
 		btnClear.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				textAreaEmployee.setText("");
+				lstDepartment.clearSelection();
+				lstProject.clearSelection();
+				chckbxNotDept.setSelected(false);
+				chckbxNotProject.setSelected(false);
 			}
 		});
 		btnClear.setBounds(236, 276, 89, 23);
 		contentPane.add(btnClear);
+	}
+	
+	/**
+	 * Establishes a connection to the specified database
+	 * @param dbName The name of the database to connect to
+	 * @return true if connection successful, false otherwise
+	 */
+	private boolean connectToDatabase(String dbName) {
+		try {
+			// Load MySQL JDBC driver
+			Class.forName("com.mysql.cj.jdbc.Driver");
+			
+			// Establish connection
+			String url = DB_URL_PREFIX + dbName + "?useSSL=false&serverTimezone=UTC";
+			connection = DriverManager.getConnection(url, DB_USER, DB_PASSWORD);
+			return true;
+			
+		} catch (ClassNotFoundException e) {
+			JOptionPane.showMessageDialog(this, 
+				"MySQL JDBC Driver not found. Please add mysql-connector-java to classpath.", 
+				"Driver Error", JOptionPane.ERROR_MESSAGE);
+			e.printStackTrace();
+			return false;
+		} catch (SQLException e) {
+			JOptionPane.showMessageDialog(this, 
+				"Failed to connect to database: " + e.getMessage(), 
+				"Database Error", JOptionPane.ERROR_MESSAGE);
+			e.printStackTrace();
+			return false;
+		}
+	}
+	
+	/**
+	 * Loads all departments from the database into the department list
+	 */
+	private void loadDepartments() {
+		department.clear();
+		String query = "SELECT Dname, Dnumber FROM DEPARTMENT ORDER BY Dname";
 		
-		textAreaEmployee = new JTextArea();
-		textAreaEmployee.setBounds(36, 197, 339, 68);
-		contentPane.add(textAreaEmployee);
+		try (PreparedStatement stmt = connection.prepareStatement(query);
+			 ResultSet rs = stmt.executeQuery()) {
+			
+			while (rs.next()) {
+				String deptName = rs.getString("Dname");
+				int deptNum = rs.getInt("Dnumber");
+				department.addElement(deptName + " (" + deptNum + ")");
+			}
+			
+		} catch (SQLException e) {
+			JOptionPane.showMessageDialog(this, 
+				"Error loading departments: " + e.getMessage(), 
+				"Database Error", JOptionPane.ERROR_MESSAGE);
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * Loads all projects from the database into the project list
+	 */
+	private void loadProjects() {
+		project.clear();
+		String query = "SELECT Pname, Pnumber FROM PROJECT ORDER BY Pname";
+		
+		try (PreparedStatement stmt = connection.prepareStatement(query);
+			 ResultSet rs = stmt.executeQuery()) {
+			
+			while (rs.next()) {
+				String projName = rs.getString("Pname");
+				int projNum = rs.getInt("Pnumber");
+				project.addElement(projName + " (" + projNum + ")");
+			}
+			
+		} catch (SQLException e) {
+			JOptionPane.showMessageDialog(this, 
+				"Error loading projects: " + e.getMessage(), 
+				"Database Error", JOptionPane.ERROR_MESSAGE);
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * Searches for employees based on selected departments and projects
+	 * Handles multiple selections and NOT conditions
+	 */
+	private void searchEmployees() {
+		textAreaEmployee.setText("");
+		
+		List<String> selectedDepts = lstDepartment.getSelectedValuesList();
+		List<String> selectedProjs = lstProject.getSelectedValuesList();
+		boolean notDept = chckbxNotDept.isSelected();
+		boolean notProj = chckbxNotProject.isSelected();
+		
+		// Build the SQL query dynamically
+		StringBuilder query = new StringBuilder();
+		query.append("SELECT DISTINCT E.Fname, E.Minit, E.Lname, E.Ssn, E.Salary, ");
+		query.append("D.Dname, E.Dno FROM EMPLOYEE E ");
+		query.append("LEFT JOIN DEPARTMENT D ON E.Dno = D.Dnumber ");
+		
+		// Add WORKS_ON join if projects are selected
+		if (!selectedProjs.isEmpty()) {
+			query.append("LEFT JOIN WORKS_ON W ON E.Ssn = W.Essn ");
+		}
+		
+		query.append("WHERE 1=1 ");
+		
+		// Add department conditions
+		if (!selectedDepts.isEmpty()) {
+			int[] deptNumbers = extractNumbers(selectedDepts);
+			query.append("AND E.Dno ");
+			if (notDept) {
+				query.append("NOT ");
+			}
+			query.append("IN (");
+			for (int i = 0; i < deptNumbers.length; i++) {
+				query.append(deptNumbers[i]);
+				if (i < deptNumbers.length - 1) query.append(", ");
+			}
+			query.append(") ");
+		}
+		
+		// Add project conditions
+		if (!selectedProjs.isEmpty()) {
+			int[] projNumbers = extractNumbers(selectedProjs);
+			query.append("AND ");
+			if (notProj) {
+				query.append("E.Ssn NOT IN (SELECT Essn FROM WORKS_ON WHERE Pno IN (");
+			} else {
+				query.append("W.Pno IN (");
+			}
+			for (int i = 0; i < projNumbers.length; i++) {
+				query.append(projNumbers[i]);
+				if (i < projNumbers.length - 1) query.append(", ");
+			}
+			if (notProj) {
+				query.append(")) ");
+			} else {
+				query.append(") ");
+			}
+		}
+		
+		query.append("ORDER BY E.Lname, E.Fname");
+		
+		try (PreparedStatement stmt = connection.prepareStatement(query.toString());
+			 ResultSet rs = stmt.executeQuery()) {
+			
+			StringBuilder results = new StringBuilder();
+			results.append(String.format("%-20s %-15s %-10s %-20s%n", 
+				"Name", "SSN", "Salary", "Department"));
+			results.append("=".repeat(70)).append("\n");
+			
+			int count = 0;
+			while (rs.next()) {
+				String fname = rs.getString("Fname");
+				String minit = rs.getString("Minit");
+				String lname = rs.getString("Lname");
+				String ssn = rs.getString("Ssn");
+				double salary = rs.getDouble("Salary");
+				String dname = rs.getString("Dname");
+				
+				String fullName = fname + " " + (minit != null ? minit + " " : "") + lname;
+				results.append(String.format("%-20s %-15s $%-9.2f %-20s%n", 
+					fullName, ssn, salary, dname != null ? dname : "N/A"));
+				count++;
+			}
+			
+			results.append("\nTotal Employees Found: ").append(count);
+			textAreaEmployee.setText(results.toString());
+			
+			if (count == 0) {
+				textAreaEmployee.setText("No employees found matching the criteria.");
+			}
+			
+		} catch (SQLException e) {
+			JOptionPane.showMessageDialog(this, 
+				"Error searching employees: " + e.getMessage(), 
+				"Database Error", JOptionPane.ERROR_MESSAGE);
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * Extracts department or project numbers from selected items in format "Name (Number)"
+	 * @param selectedItems List of selected items
+	 * @return Array of extracted numbers
+	 */
+	private int[] extractNumbers(List<String> selectedItems) {
+		int[] numbers = new int[selectedItems.size()];
+		for (int i = 0; i < selectedItems.size(); i++) {
+			String item = selectedItems.get(i);
+			int startIdx = item.lastIndexOf("(") + 1;
+			int endIdx = item.lastIndexOf(")");
+			numbers[i] = Integer.parseInt(item.substring(startIdx, endIdx));
+		}
+		return numbers;
+	}
+	
+	/**
+	 * Closes the database connection
+	 */
+	private void closeConnection() {
+		if (connection != null) {
+			try {
+				connection.close();
+				connection = null;
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }
