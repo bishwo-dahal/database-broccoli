@@ -1,6 +1,9 @@
 # database-broccoli
 Project for CSCI 4055 class - Employee Database Search Application
 
+## Demo
+![Application Screenshot](demo.png)
+
 ## Features
 - Database connection to MySQL using JDBC
 - Employee search with multiple filter criteria
