@@ -67,7 +67,7 @@ public class EmployeeSearchFrame extends JFrame {
 	public EmployeeSearchFrame() {
 		setTitle("Employee Search");
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		setBounds(100, 100, 450, 347);
+		setBounds(100, 100, 450, 420);
 		contentPane = new JPanel();
 		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
 		
@@ -151,18 +151,6 @@ public class EmployeeSearchFrame extends JFrame {
 		chckbxNotProject.setBounds(270, 150, 59, 23);
 		contentPane.add(chckbxNotProject);
 		
-		JLabel lblEmployee = new JLabel("Employee");
-		lblEmployee.setFont(new Font("Times New Roman", Font.BOLD, 12));
-		lblEmployee.setBounds(52, 179, 89, 14);
-		contentPane.add(lblEmployee);
-		
-		textAreaEmployee = new JTextArea();
-		textAreaEmployee.setEditable(false);
-		textAreaEmployee.setFont(new Font("Courier New", Font.PLAIN, 11));
-		JScrollPane scrollEmployee = new JScrollPane(textAreaEmployee);
-		scrollEmployee.setBounds(36, 215, 375, 100);
-		contentPane.add(scrollEmployee);
-		
 		JButton btnSearch = new JButton("Search");
 		btnSearch.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -175,7 +163,8 @@ public class EmployeeSearchFrame extends JFrame {
 				searchEmployees();
 			}
 		});
-		btnSearch.setBounds(80, 276, 89, 23);
+		btnSearch.setFont(new Font("Times New Roman", Font.BOLD, 12));
+		btnSearch.setBounds(100, 185, 89, 25);
 		contentPane.add(btnSearch);
 		
 		JButton btnClear = new JButton("Clear");
@@ -188,8 +177,21 @@ public class EmployeeSearchFrame extends JFrame {
 				chckbxNotProject.setSelected(false);
 			}
 		});
-		btnClear.setBounds(236, 276, 89, 23);
+		btnClear.setFont(new Font("Times New Roman", Font.BOLD, 12));
+		btnClear.setBounds(240, 185, 89, 25);
 		contentPane.add(btnClear);
+		
+		JLabel lblEmployee = new JLabel("Employee Results:");
+		lblEmployee.setFont(new Font("Times New Roman", Font.BOLD, 12));
+		lblEmployee.setBounds(36, 220, 150, 14);
+		contentPane.add(lblEmployee);
+		
+		textAreaEmployee = new JTextArea();
+		textAreaEmployee.setEditable(false);
+		textAreaEmployee.setFont(new Font("Courier New", Font.PLAIN, 11));
+		JScrollPane scrollEmployee = new JScrollPane(textAreaEmployee);
+		scrollEmployee.setBounds(36, 240, 375, 130);
+		contentPane.add(scrollEmployee);
 	}
 	
 	/**
