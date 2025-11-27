@@ -19,10 +19,14 @@ import javax.swing.JCheckBox;
 import javax.swing.JOptionPane;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
+import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 
 public class EmployeeSearchFrame extends JFrame {
 
@@ -217,7 +221,23 @@ private boolean connectToDatabase(String dbName) {
  */
 private void loadDepartments() {
 	department.clear();
-// load departments here
+	String query = "SELECT Dname, Dnumber FROM DEPARTMENT ORDER BY Dname";
+	
+	try (PreparedStatement stmt = connection.prepareStatement(query);
+		 ResultSet rs = stmt.executeQuery()) {
+		
+		while (rs.next()) {
+			String deptName = rs.getString("Dname");
+			int deptNum = rs.getInt("Dnumber");
+			department.addElement(deptName + " (" + deptNum + ")");
+		}
+		
+	} catch (SQLException e) {
+		JOptionPane.showMessageDialog(this, 
+			"Error loading departments: " + e.getMessage(), 
+			"Database Error", JOptionPane.ERROR_MESSAGE);
+		e.printStackTrace();
+	}
 }
 
 /**
@@ -225,10 +245,29 @@ private void loadDepartments() {
  */
 private void loadProjects() {
 	project.clear();
-// load projects here
+	String query = "SELECT Pname, Pnumber FROM PROJECT ORDER BY Pname";
+	
+	try (PreparedStatement stmt = connection.prepareStatement(query);
+		 ResultSet rs = stmt.executeQuery()) {
+		
+		while (rs.next()) {
+			String projName = rs.getString("Pname");
+			int projNum = rs.getInt("Pnumber");
+			project.addElement(projName + " (" + projNum + ")");
+		}
+		
+	} catch (SQLException e) {
+		JOptionPane.showMessageDialog(this, 
+			"Error loading projects: " + e.getMessage(), 
+			"Database Error", JOptionPane.ERROR_MESSAGE);
+		e.printStackTrace();
+	}
 }
 
-
+/**
+ * Searches for employees based on selected departments and projects
+ * Handles multiple selections and NOT conditions
+ */
 private void searchEmployees() {
 // search employees here
 }
