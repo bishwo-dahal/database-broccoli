@@ -325,7 +325,43 @@ private void searchEmployees() {
 	}
 	
 	query.append("ORDER BY E.Lname, E.Fname");
-	System.out.println("Query is "+ query);
+		
+	try (PreparedStatement stmt = connection.prepareStatement(query.toString());
+		 ResultSet rs = stmt.executeQuery()) {
+		
+		StringBuilder results = new StringBuilder();
+		results.append(String.format("%-20s %-15s %-10s %-20s%n", 
+			"Name", "SSN", "Salary", "Department"));
+		results.append("=".repeat(70)).append("\n");
+		
+		int count = 0;
+		while (rs.next()) {
+			String fname = rs.getString("Fname");
+			String minit = rs.getString("Minit");
+			String lname = rs.getString("Lname");
+			String ssn = rs.getString("Ssn");
+			double salary = rs.getDouble("Salary");
+			String dname = rs.getString("Dname");
+			
+			String fullName = fname + " " + (minit != null ? minit + " " : "") + lname;
+			results.append(String.format("%-20s %-15s $%-9.2f %-20s%n", 
+				fullName, ssn, salary, dname != null ? dname : "N/A"));
+			count++;
+		}
+		
+		results.append("\nTotal Employees Found: ").append(count);
+		textAreaEmployee.setText(results.toString());
+		
+		if (count == 0) {
+			textAreaEmployee.setText("No employees found matching the criteria.");
+		}
+		
+	} catch (SQLException e) {
+		JOptionPane.showMessageDialog(this, 
+			"Error searching employees: " + e.getMessage(), 
+			"Database Error", JOptionPane.ERROR_MESSAGE);
+		e.printStackTrace();
+	}
 }
 
 /**
