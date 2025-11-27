@@ -16,10 +16,13 @@ import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JList;
 import javax.swing.JCheckBox;
+import javax.swing.JOptionPane;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
-import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 
 public class EmployeeSearchFrame extends JFrame {
 
@@ -31,6 +34,14 @@ public class EmployeeSearchFrame extends JFrame {
 	private JList<String> lstProject;
 	private DefaultListModel<String> project = new DefaultListModel<String>();
 	private JTextArea textAreaEmployee;
+	private JCheckBox chckbxNotDept;
+	private JCheckBox chckbxNotProject;
+	
+	// Database connection parameters
+	private static final String DB_URL_PREFIX = "jdbc:mysql://localhost:3306/";
+	private static final String DB_USER = "root";  // Change as needed
+	private static final String DB_PASSWORD = "";  // Change as needed
+	private Connection connection = null;
 	/**
 	 * Launch the application.
 	 */
@@ -65,29 +76,39 @@ public class EmployeeSearchFrame extends JFrame {
 		lblNewLabel.setBounds(21, 23, 59, 14);
 		contentPane.add(lblNewLabel);
 		
-		txtDatabase = new JTextField();
-		txtDatabase.setBounds(90, 20, 193, 20);
-		contentPane.add(txtDatabase);
-		txtDatabase.setColumns(10);
+	txtDatabase = new JTextField();
+	txtDatabase.setText("company");  // Default database name
+	txtDatabase.setBounds(90, 20, 193, 20);
+	contentPane.add(txtDatabase);
+	txtDatabase.setColumns(10);
 		
 		JButton btnDBFill = new JButton("Fill");
 		/**
 		 * The btnDBFill should fill the department and project JList with the 
 		 * departments and projects from your entered database name.
 		 */
-		btnDBFill.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				String[] dept = {"Headquarters", "Reorganization"};	
-				for(int i = 0; i < dept.length; i++) {
-					department.addElement(dept[i]);
-				}
-				String[] prj = {"ProdoctX", "ProductY", "ProductZ"};
-				for(int j = 0; j < prj.length; j++) {
-					project.addElement(prj[j]);
-				}
-				
+	btnDBFill.addActionListener(new ActionListener() {
+		public void actionPerformed(ActionEvent e) {
+			String dbName = txtDatabase.getText().trim();
+			if (dbName.isEmpty()) {
+				JOptionPane.showMessageDialog(EmployeeSearchFrame.this, 
+					"Please enter a database name.", "Error", JOptionPane.ERROR_MESSAGE);
+				return;
 			}
-		});
+			
+			// Close existing connection if any
+			closeConnection();
+			
+			// Connect to database and load data
+			if (connectToDatabase(dbName)) {
+				loadDepartments();
+				loadProjects();
+				JOptionPane.showMessageDialog(EmployeeSearchFrame.this, 
+					"Successfully loaded departments and projects from database: " + dbName, 
+					"Success", JOptionPane.INFORMATION_MESSAGE);
+			}
+		}
+	});
 		
 		btnDBFill.setFont(new Font("Times New Roman", Font.BOLD, 12));
 		btnDBFill.setBounds(307, 19, 68, 23);
@@ -103,19 +124,19 @@ public class EmployeeSearchFrame extends JFrame {
 		lblProject.setBounds(255, 63, 47, 14);
 		contentPane.add(lblProject);
 		
-		lstProject = new JList<String>(new DefaultListModel<String>());
-		lstProject.setFont(new Font("Tahoma", Font.PLAIN, 12));
-		lstProject.setModel(project);
-		lstProject.setBounds(225, 84, 150, 42);
-		contentPane.add(lstProject);
-		
-		JCheckBox chckbxNotDept = new JCheckBox("Not");
-		chckbxNotDept.setBounds(71, 133, 59, 23);
-		contentPane.add(chckbxNotDept);
-		
-		JCheckBox chckbxNotProject = new JCheckBox("Not");
-		chckbxNotProject.setBounds(270, 133, 59, 23);
-		contentPane.add(chckbxNotProject);
+	lstProject = new JList<String>(new DefaultListModel<String>());
+	lstProject.setFont(new Font("Tahoma", Font.PLAIN, 12));
+	lstProject.setModel(project);
+	lstProject.setBounds(225, 84, 150, 42);
+	contentPane.add(lstProject);
+	
+	chckbxNotDept = new JCheckBox("Not");
+	chckbxNotDept.setBounds(71, 133, 59, 23);
+	contentPane.add(chckbxNotDept);
+	
+	chckbxNotProject = new JCheckBox("Not");
+	chckbxNotProject.setBounds(270, 133, 59, 23);
+	contentPane.add(chckbxNotProject);
 		
 		lstDepartment = new JList<String>(new DefaultListModel<String>());
 		lstDepartment.setBounds(36, 84, 172, 40);
@@ -128,26 +149,102 @@ public class EmployeeSearchFrame extends JFrame {
 		lblEmployee.setBounds(52, 179, 89, 14);
 		contentPane.add(lblEmployee);
 		
-		JButton btnSearch = new JButton("Search");
-		btnSearch.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				textAreaEmployee.setText("John Smith\nFranklin Wong");
+	JButton btnSearch = new JButton("Search");
+	btnSearch.addActionListener(new ActionListener() {
+		public void actionPerformed(ActionEvent e) {
+			if (connection == null) {
+				JOptionPane.showMessageDialog(EmployeeSearchFrame.this, 
+					"Please connect to database first by clicking Fill button.", 
+					"Error", JOptionPane.ERROR_MESSAGE);
+				return;
 			}
-		});
-		btnSearch.setBounds(80, 276, 89, 23);
-		contentPane.add(btnSearch);
+			searchEmployees();
+		}
+	});
+	btnSearch.setBounds(80, 276, 89, 23);
+	contentPane.add(btnSearch);
 		
-		JButton btnClear = new JButton("Clear");
-		btnClear.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				textAreaEmployee.setText("");
-			}
-		});
-		btnClear.setBounds(236, 276, 89, 23);
-		contentPane.add(btnClear);
+	JButton btnClear = new JButton("Clear");
+	btnClear.addActionListener(new ActionListener() {
+		public void actionPerformed(ActionEvent e) {
+			textAreaEmployee.setText("");
+			lstDepartment.clearSelection();
+			lstProject.clearSelection();
+			chckbxNotDept.setSelected(false);
+			chckbxNotProject.setSelected(false);
+		}
+	});
+	btnClear.setBounds(236, 276, 89, 23);
+	contentPane.add(btnClear);
 		
-		textAreaEmployee = new JTextArea();
-		textAreaEmployee.setBounds(36, 197, 339, 68);
-		contentPane.add(textAreaEmployee);
+	textAreaEmployee = new JTextArea();
+	textAreaEmployee.setBounds(36, 197, 339, 68);
+	contentPane.add(textAreaEmployee);
+}
+
+/**
+ * Establishes a connection to the specified database
+ * @param dbName The name of the database to connect to
+ * @return true if connection successful, false otherwise
+ */
+private boolean connectToDatabase(String dbName) {
+	try {
+		// Load MySQL JDBC driver
+		Class.forName("com.mysql.cj.jdbc.Driver");
+		
+		// Establish connection
+		String url = DB_URL_PREFIX + dbName + "?useSSL=false&serverTimezone=UTC";
+		connection = DriverManager.getConnection(url, DB_USER, DB_PASSWORD);
+		return true;
+		
+	} catch (ClassNotFoundException e) {
+		JOptionPane.showMessageDialog(this, 
+			"MySQL JDBC Driver not found. Please add mysql-connector-java to classpath.", 
+			"Driver Error", JOptionPane.ERROR_MESSAGE);
+		e.printStackTrace();
+		return false;
+	} catch (SQLException e) {
+		JOptionPane.showMessageDialog(this, 
+			"Failed to connect to database: " + e.getMessage(), 
+			"Database Error", JOptionPane.ERROR_MESSAGE);
+		e.printStackTrace();
+		return false;
 	}
+}
+
+/**
+ * Loads all departments from the database into the department list
+ */
+private void loadDepartments() {
+	department.clear();
+// load departments here
+}
+
+/**
+ * Loads all projects from the database into the project list
+ */
+private void loadProjects() {
+	project.clear();
+// load projects here
+}
+
+
+private void searchEmployees() {
+// search employees here
+}
+
+
+/**
+ * Closes the database connection
+ */
+private void closeConnection() {
+	if (connection != null) {
+		try {
+			connection.close();
+			connection = null;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+	}
+}
 }
