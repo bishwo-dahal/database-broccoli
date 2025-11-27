@@ -65,7 +65,7 @@ public class EmployeeSearchFrame extends JFrame {
 	 * Create the frame.
 	 */
 	public EmployeeSearchFrame() {
-		setTitle("Employee Search");
+		setTitle("Employee Search - Developed by Samyam Bhattarai, Bishwo Dahal, and Sulav Dhakal");
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setBounds(100, 100, 450, 420);
 		contentPane = new JPanel();
