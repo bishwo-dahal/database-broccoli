@@ -269,9 +269,80 @@ private void loadProjects() {
  * Handles multiple selections and NOT conditions
  */
 private void searchEmployees() {
-// search employees here
+	textAreaEmployee.setText("");
+	
+	List<String> selectedDepts = lstDepartment.getSelectedValuesList();
+	List<String> selectedProjs = lstProject.getSelectedValuesList();
+	boolean notDept = chckbxNotDept.isSelected();
+	boolean notProj = chckbxNotProject.isSelected();
+	
+	// Build the SQL query dynamically
+	StringBuilder query = new StringBuilder();
+	query.append("SELECT DISTINCT E.Fname, E.Minit, E.Lname, E.Ssn, E.Salary, ");
+	query.append("D.Dname, E.Dno FROM EMPLOYEE E ");
+	query.append("LEFT JOIN DEPARTMENT D ON E.Dno = D.Dnumber ");
+	
+	// Add WORKS_ON join if projects are selected
+	if (!selectedProjs.isEmpty()) {
+		query.append("LEFT JOIN WORKS_ON W ON E.Ssn = W.Essn ");
+	}
+	
+	query.append("WHERE 1=1 ");
+	
+	// Add department conditions
+	if (!selectedDepts.isEmpty()) {
+		int[] deptNumbers = extractNumbers(selectedDepts);
+		query.append("AND E.Dno ");
+		if (notDept) {
+			query.append("NOT ");
+		}
+		query.append("IN (");
+		for (int i = 0; i < deptNumbers.length; i++) {
+			query.append(deptNumbers[i]);
+			if (i < deptNumbers.length - 1) query.append(", ");
+		}
+		query.append(") ");
+	}
+	
+	// Add project conditions
+	if (!selectedProjs.isEmpty()) {
+		int[] projNumbers = extractNumbers(selectedProjs);
+		query.append("AND ");
+		if (notProj) {
+			query.append("E.Ssn NOT IN (SELECT Essn FROM WORKS_ON WHERE Pno IN (");
+		} else {
+			query.append("W.Pno IN (");
+		}
+		for (int i = 0; i < projNumbers.length; i++) {
+			query.append(projNumbers[i]);
+			if (i < projNumbers.length - 1) query.append(", ");
+		}
+		if (notProj) {
+			query.append(")) ");
+		} else {
+			query.append(") ");
+		}
+	}
+	
+	query.append("ORDER BY E.Lname, E.Fname");
+	System.out.println("Query is "+ query);
 }
 
+/**
+ * Extracts department or project numbers from items to "Name (Number)"
+ * @param selectedItems List of selected items
+ * @return Array of extracted numbers
+ */
+private int[] extractNumbers(List<String> selectedItems) {
+	int[] numbers = new int[selectedItems.size()];
+	for (int i = 0; i < selectedItems.size(); i++) {
+		String item = selectedItems.get(i);
+		int startIdx = item.lastIndexOf("(") + 1;
+		int endIdx = item.lastIndexOf(")");
+		numbers[i] = Integer.parseInt(item.substring(startIdx, endIdx));
+	}
+	return numbers;
+}
 
 /**
  * Closes the database connection
